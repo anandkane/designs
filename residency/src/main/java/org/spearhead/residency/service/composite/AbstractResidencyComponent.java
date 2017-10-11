@@ -74,11 +74,6 @@ public abstract class AbstractResidencyComponent implements ResidencyComponent {
                 iteratorStack.pop();
             }
 
-//            next = iteratorStack.isEmpty() ? null : iteratorStack.peek().next();
-//            if (!this.next.getChildComponents().isEmpty()) {
-//                iteratorStack.push(this.next.getChildComponents().iterator());
-//            }
-
             return current;
         }
     }

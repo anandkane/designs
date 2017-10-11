@@ -4,11 +4,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.spearhead.residency.data.entity.Apartment;
 import org.spearhead.residency.data.repository.ApartmentRepository;
-import org.spearhead.residency.service.composite.ResidencyComponent;
-import org.spearhead.residency.service.composite.ResidencyComponentType;
-import org.spearhead.residency.service.composite.SocietyComponent;
+import org.spearhead.residency.service.composite.*;
+import org.spearhead.residency.service.visitor.OverCrowdingVisitor;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.PrimitiveIterator.OfInt;
+import java.util.Random;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
@@ -17,7 +20,8 @@ import static org.spearhead.residency.service.composite.ResidencyComponentType.*
 
 public class ResidencyServiceTest {
     private ApartmentRepository apartmentRepository;
-
+    private Random random = new Random();
+    private final OfInt randomMembers = random.ints(0, 7).iterator();
 
     @Before
     public void setup() {
@@ -25,21 +29,8 @@ public class ResidencyServiceTest {
     }
 
     @Test
-    public void getResidencyComposite() {
-        ArrayList<Apartment> apartments = getComplexApartments();
-        when(apartmentRepository.findAll()).thenReturn(apartments);
-
-        ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
-        ResidencyComponent residencyComposite = service.getResidencyComposite();
-        Iterator<ResidencyComponent> iterator = residencyComposite.iterator();
-        while (iterator.hasNext()) {
-            System.out.println(iterator.next().toString());
-        }
-    }
-
-    @Test
     public void testSimpleComposite() {
-        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2);
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2, randomMembers);
         when(apartmentRepository.findAll()).thenReturn(apartments);
 
         ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
@@ -61,7 +52,7 @@ public class ResidencyServiceTest {
 
     @Test
     public void testSimpleIteration() {
-        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2);
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2, randomMembers);
         when(apartmentRepository.findAll()).thenReturn(apartments);
 
         ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
@@ -99,7 +90,7 @@ public class ResidencyServiceTest {
 
     @Test
     public void testArbitraryNodeIteration() {
-        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2);
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2, randomMembers);
         when(apartmentRepository.findAll()).thenReturn(apartments);
 
         ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
@@ -130,6 +121,94 @@ public class ResidencyServiceTest {
         assertFalse(iterator.hasNext());
     }
 
+    @Test
+    public void testGetResidentCount() {
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2, randomMembers);
+        for (Apartment apartment : apartments) {
+            apartment.setMemberCount(1);
+        }
+
+        when(apartmentRepository.findAll()).thenReturn(apartments);
+        ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
+        int residentCount = service.getResidentCount(service.getResidencyComposite());
+        assertEquals(8, residentCount);
+    }
+
+    @Test
+    public void testApartmentResidentCount() {
+        // Test that individual apartments return right resident count
+        Apartment apartment = new Apartment();
+        apartment.setMemberCount(10);
+        ApartmentComponent component = new ApartmentComponent(apartment);
+
+        assertEquals(10, component.getResidentCount());
+    }
+
+    @Test
+    public void testNonApartmentResidentCount() {
+        // Test that components other than Apartment do not add to the resident count
+        Apartment apartment = new Apartment();
+        apartment.setMemberCount(10);
+
+        ResidencyComponent component;
+        component = new SocietyComponent("");
+        assertEquals(0, component.getResidentCount());
+        component = new WingComponent(apartment);
+        assertEquals(0, component.getResidentCount());
+        component = new BuildingComponent(apartment);
+        assertEquals(0, component.getResidentCount());
+        component = new FloorComponent(apartment);
+        assertEquals(0, component.getResidentCount());
+    }
+
+    @Test
+    public void testOverCrowdedApartments() {
+        OfInt randomMembers = random.ints(0, 4).iterator();
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 1, 2, randomMembers);
+        for (int i = 0; i < 4; i++) {
+            apartments.get(i).setMemberCount(6);
+        }
+        when(apartmentRepository.findAll()).thenReturn(apartments);
+
+        ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
+        ResidencyComponent component = service.getResidencyComposite();
+
+        OverCrowdingVisitor visitor = new OverCrowdingVisitor(APARTMENT);
+        Iterator<ResidencyComponent> iterator = component.iterator();
+        while (iterator.hasNext()) {
+            iterator.next().accept(visitor);
+        }
+
+        assertEquals(4, visitor.getApartments().size());
+        assertEquals(0, visitor.getBuildings().size());
+    }
+
+    @Test
+    public void testOverCrowdedBuildings() {
+        OfInt randomMembers = random.ints(0, 4).iterator();
+        List<Apartment> apartments = getSimpleApartmentList(new String[]{"A"}, 2, 2, randomMembers);
+        for (Apartment apartment : apartments) {
+            if (apartment.getBuilding().equals("A1")) {
+                apartment.setMemberCount(6);
+            }
+        }
+
+        when(apartmentRepository.findAll()).thenReturn(apartments);
+
+        ResidencyService service = new ResidencyServiceImpl(apartmentRepository);
+        ResidencyComponent component = service.getResidencyComposite();
+
+        OverCrowdingVisitor visitor = new OverCrowdingVisitor(BUILDING);
+        Iterator<ResidencyComponent> iterator = component.iterator();
+        while (iterator.hasNext()) {
+            iterator.next().accept(visitor);
+        }
+
+        assertEquals(1, visitor.getBuildings().size());
+        assertEquals("A1", visitor.getBuildings().get(0).getBuilding());
+        assertEquals(0, visitor.getApartments().size());
+    }
+
     private void validateComponent(ResidencyComponent component, int expectedChildCount,
                                    ResidencyComponentType componentType) {
         assertNotNull(component);
@@ -138,8 +217,8 @@ public class ResidencyServiceTest {
         assertEquals(expectedChildCount, component.getChildComponents().size());
     }
 
-    private List<Apartment> getSimpleApartmentList(String[] wings, int buildingCount, int floorCount) {
-        PrimitiveIterator.OfInt randomMembers = new Random().ints(0, 7).iterator();
+    private List<Apartment> getSimpleApartmentList(String[] wings, int buildingCount, int floorCount,
+                                                   OfInt randomMembers) {
         ArrayList<Apartment> apartments = new ArrayList<>();
         for (String wing : wings) {
             fillWingApartments(randomMembers, apartments, wing, buildingCount, floorCount);
@@ -147,23 +226,7 @@ public class ResidencyServiceTest {
         return apartments;
     }
 
-    private ArrayList<Apartment> getComplexApartments() {
-        String[] wings = {"A", "B", "C"};
-        PrimitiveIterator.OfInt randomBldgs = new Random().ints(1, 3).iterator();
-        PrimitiveIterator.OfInt randomFloors = new Random().ints(4, 5).iterator();
-        PrimitiveIterator.OfInt randomMembers = new Random().ints(0, 7).iterator();
-        ArrayList<Apartment> apartments = new ArrayList<>();
-        for (String wing : wings) {
-            int buildingCount = randomBldgs.nextInt();
-            int floorCount = randomFloors.nextInt();
-
-            fillWingApartments(randomMembers, apartments, wing, buildingCount, floorCount);
-        }
-
-        return apartments;
-    }
-
-    private void fillWingApartments(PrimitiveIterator.OfInt randomMembers, ArrayList<Apartment> apartments, String wing, int buildingCount, int floorCount) {
+    private void fillWingApartments(OfInt randomMembers, ArrayList<Apartment> apartments, String wing, int buildingCount, int floorCount) {
         for (int i = 1; i <= buildingCount; i++) {
             for (int j = 1; j <= floorCount; j++) {
                 for (int k = 1; k <= 4; k++) {

@@ -2,6 +2,7 @@ package org.spearhead.residency.service.composite;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.spearhead.residency.service.visitor.ResidencyComponentVisitor;
 
 public class SocietyComponent extends AbstractResidencyComponent {
     private String name;
@@ -35,5 +36,10 @@ public class SocietyComponent extends AbstractResidencyComponent {
     @Override
     public String toString() {
         return name;
+    }
+
+    @Override
+    public void accept(ResidencyComponentVisitor visitor) {
+        visitor.visitSociety(this);
     }
 }

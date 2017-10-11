@@ -27,24 +27,52 @@ public class Apartment {
         this.memberCount = memberCount;
     }
 
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
     public String getWing() {
         return wing;
+    }
+
+    public void setWing(String wing) {
+        this.wing = wing;
     }
 
     public String getBuilding() {
         return building;
     }
 
+    public void setBuilding(String building) {
+        this.building = building;
+    }
+
     public int getFloor() {
         return floor;
+    }
+
+    public void setFloor(int floor) {
+        this.floor = floor;
     }
 
     public int getNumber() {
         return number;
     }
 
+    public void setNumber(int number) {
+        this.number = number;
+    }
+
     public int getMemberCount() {
         return memberCount;
+    }
+
+    public void setMemberCount(int memberCount) {
+        this.memberCount = memberCount;
     }
 
     @Override

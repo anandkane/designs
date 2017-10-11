@@ -3,6 +3,7 @@ package org.spearhead.residency.service.composite;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.spearhead.residency.data.entity.Apartment;
+import org.spearhead.residency.service.visitor.ResidencyComponentVisitor;
 
 public class BuildingComponent extends AbstractResidencyComponent {
     private String wing;
@@ -42,5 +43,10 @@ public class BuildingComponent extends AbstractResidencyComponent {
     @Override
     public String toString() {
         return building;
+    }
+
+    @Override
+    public void accept(ResidencyComponentVisitor visitor) {
+        visitor.visitBuilding(this);
     }
 }
